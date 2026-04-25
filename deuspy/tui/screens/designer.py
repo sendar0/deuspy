@@ -32,54 +32,55 @@ class DesignerScreen(Container):
 
     DEFAULT_CSS = """
     DesignerScreen {
-        layout: horizontal;
+        layout: grid;
+        grid-size: 2 1;
+        grid-columns: 42 1fr;
+        grid-gutter: 0 2;
         padding: 1 2;
     }
     #designer-form {
-        width: 40;
-        height: 1fr;
-        border: round #a855f7;
+        layout: vertical;
+        border: round $surface;
+        background: $surface;
         padding: 0 1;
-        background: #181826;
     }
+    #designer-form:focus-within { border: round cyan; }
     #designer-preview {
-        width: 1fr;
-        height: 1fr;
-        margin-left: 1;
-    }
-    .form-title {
-        content-align: center middle;
-        color: #ff00aa;
-        text-style: bold;
-        height: 1;
-        margin-bottom: 1;
+        layout: grid;
+        grid-size: 1 2;
+        grid-rows: 3 1fr;
+        grid-gutter: 1 0;
     }
     .form-row {
+        layout: horizontal;
         height: 3;
     }
     .form-label {
         width: 14;
-        color: #8080a0;
+        color: $text-muted;
         padding: 1 1;
     }
     .form-input { width: 1fr; }
+    .form-divider {
+        color: $text-muted;
+        text-style: italic;
+        margin: 1 0 0 0;
+    }
     #designer-actions {
         height: 3;
-        margin-top: 1;
         align: center middle;
     }
     #designer-stats {
-        height: 1;
-        margin-bottom: 1;
         content-align: center middle;
-        background: #181826;
+        background: $boost;
+        border: round $surface;
+        padding: 1 1;
     }
-    #designer-toolpath { height: 1fr; }
     """
 
     def compose(self) -> ComposeResult:
         with Vertical(id="designer-form"):
-            yield Static("◆ SHAPE BUILDER ◆", classes="form-title")
+            yield Static("◆ SHAPE BUILDER ◆", classes="panel-title")
             with Horizontal(classes="form-row"):
                 yield Label("Shape", classes="form-label")
                 yield Select(SHAPES, value="box", id="sel-shape", classes="form-input", allow_blank=False)
@@ -88,7 +89,7 @@ class DesignerScreen(Container):
                 yield Select(
                     STRATEGIES, value="pocket", id="sel-strategy", classes="form-input", allow_blank=False,
                 )
-            yield Static("[#8080a0]── Shape parameters ──[/]")
+            yield Static("── shape parameters ──", classes="form-divider")
             with Horizontal(classes="form-row"):
                 yield Label("p1", classes="form-label", id="lbl-p1")
                 yield Input(value="10", id="in-p1", classes="form-input")
@@ -101,7 +102,7 @@ class DesignerScreen(Container):
             with Horizontal(classes="form-row"):
                 yield Label("p4", classes="form-label", id="lbl-p4")
                 yield Input(value="5", id="in-p4", classes="form-input")
-            yield Static("[#8080a0]── Cutting context ──[/]")
+            yield Static("── cutting context ──", classes="form-divider")
             with Horizontal(classes="form-row"):
                 yield Label("Tool Ø", classes="form-label")
                 yield Input(value="3.0", id="in-tool", classes="form-input")
@@ -112,11 +113,11 @@ class DesignerScreen(Container):
                 yield Label("Safe Z", classes="form-label")
                 yield Input(value="5", id="in-safez", classes="form-input")
             with Horizontal(id="designer-actions"):
-                yield Button("⚙ Dry Run", variant="primary", id="btn-preview")
-                yield Button("👁 3D View", id="btn-3d")
-                yield Button("📋 Copy G-code", id="btn-copy")
+                yield Button("⏵ Dry Run", variant="primary", id="btn-preview")
+                yield Button("◉ 3D View", variant="success", id="btn-3d")
+                yield Button("⧉ Copy G", id="btn-copy")
         with Vertical(id="designer-preview"):
-            yield Static("[#8080a0](preview pending — press Dry Run)[/]", id="designer-stats")
+            yield Static("[dim](preview pending — press Dry Run)[/]", id="designer-stats")
             yield ToolpathView(id="designer-toolpath")
 
     def on_mount(self) -> None:
@@ -239,16 +240,16 @@ class DesignerScreen(Container):
         from pathlib import Path
 
         try:
-            tmp = tempfile.NamedTemporaryFile(
+            with tempfile.NamedTemporaryFile(
                 mode="w", suffix=".gcode", prefix="deuspy-viz-", delete=False
-            )
-            with tmp as fh:
+            ) as fh:
                 for line in self._last_tp.iter_gcode():
                     fh.write(line + "\n")
-            log_path = Path(tmp.name).with_suffix(".log")
-            log_fh = log_path.open("w")
+                tmp_name = fh.name
+            log_path = Path(tmp_name).with_suffix(".log")
+            log_fh = log_path.open("w")  # noqa: SIM115 — handed to the subprocess
             subprocess.Popen(
-                [sys.executable, "-m", "deuspy.viz.standalone", tmp.name],
+                [sys.executable, "-m", "deuspy.viz.standalone", tmp_name],
                 stdout=log_fh,
                 stderr=log_fh,
                 start_new_session=True,

@@ -10,7 +10,7 @@ from deuspy.toolpath import Toolpath
 def _render_ascii(tp: Toolpath, width: int = 60, height: int = 24) -> str:
     """Render a top-down (XY) view of a toolpath as monospace art."""
     if len(tp) == 0:
-        return "[#8080a0](empty toolpath)[/]"
+        return "[dim](empty toolpath)[/]"
 
     xs = [m.target.x for m in tp.moves]
     ys = [m.target.y for m in tp.moves]
@@ -20,7 +20,7 @@ def _render_ascii(tp: Toolpath, width: int = 60, height: int = 24) -> str:
     dy = max(y_max - y_min, 1e-6)
 
     grid: list[list[str]] = [[" "] * width for _ in range(height)]
-    colors: list[list[str]] = [["#4a4a6a"] * width for _ in range(height)]
+    colors: list[list[str]] = [["dim"] * width for _ in range(height)]
 
     def to_cell(x: float, y: float) -> tuple[int, int]:
         cx = int((x - x_min) / dx * (width - 1))
@@ -36,16 +36,16 @@ def _render_ascii(tp: Toolpath, width: int = 60, height: int = 24) -> str:
             for x, y in _line(px, py, cx, cy):
                 if 0 <= y < height and 0 <= x < width:
                     if m.kind == "G0":
-                        ch, col = "·", "#4a4a6a"
+                        ch, col = "·", "dim"
                     elif m.kind in ("G2", "G3"):
-                        ch, col = "•", "#a855f7"
+                        ch, col = "•", "yellow"
                     else:
-                        ch, col = "█", "#00d4ff"
+                        ch, col = "█", "cyan"
                     grid[y][x] = ch
                     colors[y][x] = col
         if 0 <= cy < height and 0 <= cx < width:
             grid[cy][cx] = "◉"
-            colors[cy][cx] = "#ff00aa"
+            colors[cy][cx] = "magenta"
         px, py = cx, cy
 
     # Compose rich-coloured rows.
@@ -98,15 +98,16 @@ class ToolpathView(Static):
 
     DEFAULT_CSS = """
     ToolpathView {
-        border: round #00d4ff;
-        background: #0a0a14;
+        border: round $surface;
+        background: $background;
         padding: 0 1;
         content-align: center middle;
     }
+    ToolpathView:focus-within { border: round cyan; }
     """
 
     def __init__(self, **kwargs) -> None:
-        super().__init__("[#8080a0](preview pending)[/]", **kwargs)
+        super().__init__("[dim](preview pending)[/]", **kwargs)
         self._tp: Toolpath | None = None
 
     def show(self, tp: Toolpath) -> None:
@@ -121,7 +122,7 @@ class ToolpathView(Static):
 def toolpath_stats(tp: Toolpath) -> str:
     """One-line summary for a Toolpath."""
     if len(tp) == 0:
-        return "[#8080a0](empty)[/]"
+        return "[dim](empty)[/]"
     xs = [m.target.x for m in tp.moves]
     ys = [m.target.y for m in tp.moves]
     zs = [m.target.z for m in tp.moves]
@@ -136,10 +137,10 @@ def toolpath_stats(tp: Toolpath) -> str:
             dist += ((m.target.x - px) ** 2 + (m.target.y - py) ** 2 + (m.target.z - pz) ** 2) ** 0.5
         px, py, pz = m.target.x, m.target.y, m.target.z
     return (
-        f"[#8080a0]moves[/] [#00d4ff]{len(tp)}[/] · "
-        f"[#8080a0]G0[/] [#a855f7]{rapids}[/] · "
-        f"[#8080a0]G1[/] [#00ff88]{feeds}[/] · "
-        f"[#8080a0]arcs[/] [#fbbf24]{arcs}[/] · "
-        f"[#8080a0]cut[/] [#ff00aa]{dist:.2f}[/] · "
-        f"[#8080a0]bbox[/] [#00d4ff]{max(xs)-min(xs):.1f}×{max(ys)-min(ys):.1f}×{max(zs)-min(zs):.1f}[/]"
+        f"[dim]moves[/] [cyan b]{len(tp)}[/] · "
+        f"[dim]G0[/] [magenta]{rapids}[/] · "
+        f"[dim]G1[/] [green]{feeds}[/] · "
+        f"[dim]arcs[/] [yellow]{arcs}[/] · "
+        f"[dim]cut[/] [cyan b]{dist:.2f}[/] · "
+        f"[dim]bbox[/] [cyan]{max(xs)-min(xs):.1f}×{max(ys)-min(ys):.1f}×{max(zs)-min(zs):.1f}[/]"
     )

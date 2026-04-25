@@ -26,13 +26,13 @@ class MachineForm(ModalScreen[MachineProfile | None]):
     #form-card {
         width: 70;
         height: auto;
-        background: #181826;
-        border: round #a855f7;
+        background: $surface;
+        border: tall magenta;
         padding: 1 2;
     }
     #form-title {
         content-align: center middle;
-        color: #ff00aa;
+        color: cyan;
         text-style: bold;
         margin-bottom: 1;
     }
@@ -42,7 +42,7 @@ class MachineForm(ModalScreen[MachineProfile | None]):
     }
     .form-label {
         width: 18;
-        color: #8080a0;
+        color: $text-muted;
         padding: 1 1;
     }
     .form-input { width: 1fr; }
@@ -165,45 +165,40 @@ class MachinesScreen(Container):
 
     DEFAULT_CSS = """
     MachinesScreen {
-        layout: vertical;
+        layout: grid;
+        grid-size: 1 4;
+        grid-rows: 1 1fr 3 5;
+        grid-gutter: 1 0;
         padding: 1 2;
     }
     #machines-header {
-        height: 1;
         content-align: center middle;
-        color: #00d4ff;
-        text-style: bold;
     }
     #machines-table {
-        height: 1fr;
-        margin-top: 1;
-        border: round #a855f7;
+        border: round $surface;
     }
+    #machines-table:focus-within { border: round cyan; }
     #machines-buttons {
-        height: 3;
-        margin-top: 1;
         align: center middle;
     }
     #machines-detail {
-        height: auto;
-        max-height: 10;
-        margin-top: 1;
-        border: round #00d4ff;
+        border: round $surface;
+        background: $surface;
         padding: 0 1;
-        background: #181826;
     }
+    #machines-detail:focus-within { border: round cyan; }
     """
 
     def compose(self) -> ComposeResult:
-        yield Static("[ Saved Machines ]", id="machines-header")
+        yield Static("◆ SAVED MACHINES ◆", id="machines-header", classes="panel-title")
         yield DataTable(id="machines-table", cursor_type="row", zebra_stripes=True)
         with Horizontal(id="machines-buttons"):
-            yield Button("⚙ Add", variant="primary", id="btn-add")
+            yield Button("＋ Add", variant="primary", id="btn-add")
             yield Button("✎ Edit", id="btn-edit")
             yield Button("✖ Delete", variant="error", id="btn-delete")
-            yield Button("⚡ Set Active", id="btn-active")
-            yield Button("🔌 Connect", variant="success", id="btn-connect")
-            yield Button("⏏ Disconnect", id="btn-disconnect")
+            yield Button("⚡ Active", id="btn-active")
+            yield Button("⏵ Connect", variant="success", id="btn-connect")
+            yield Button("⏏ Disconnect", variant="warning", id="btn-disconnect")
         yield Static("Select a machine to see details.", id="machines-detail")
 
     def on_mount(self) -> None:
@@ -248,13 +243,31 @@ class MachinesScreen(Container):
         from deuspy.machine import get_machine
         store = self._store()
         m = get_machine()
-        connected = "[green]CONNECTED[/green]" if m.backends else "[red]disconnected[/red]"
-        active = store.active or "(none)"
-        sel = self._selected_name() or "(none)"
+        if m.backends:
+            led = "[green bold]● CONNECTED[/]"
+        elif m.state.name == "HALTED":
+            led = "[red bold]● HALTED[/]"
+        else:
+            led = "[dim]○ disconnected[/]"
+        active = store.active or "—"
+        sel = self._selected_name() or "—"
+        profile = store.get(sel) if sel != "—" else None
+        details = ""
+        if profile is not None:
+            details = (
+                f"\n[dim]port[/] [b]{profile.port or 'auto'}[/]   "
+                f"[dim]baud[/] [b]{profile.baud}[/]   "
+                f"[dim]units[/] [b]{profile.units}[/]   "
+                f"[dim]tool Ø[/] [b]{profile.tool_diameter:g}[/]   "
+                f"[dim]stock[/] [b]{profile.stock_x:g}×{profile.stock_y:g}×{profile.stock_z:g}[/]"
+            )
+            if profile.notes:
+                details += f"\n[dim]notes[/] {profile.notes}"
         text = (
-            f"[#8080a0]Active profile:[/] [#00d4ff bold]{active}[/]    "
-            f"[#8080a0]Machine state:[/] {connected}    "
-            f"[#8080a0]Selected:[/] [#a855f7]{sel}[/]"
+            f"[dim]active[/] [b cyan]{active}[/]   "
+            f"[dim]state[/] {led}   "
+            f"[dim]selected[/] [b]{sel}[/]"
+            f"{details}"
         )
         self.query_one("#machines-detail", Static).update(text)
 

@@ -1,191 +1,195 @@
-/* deuspy TUI — cyberpunk neon theme */
-
-$bg-darkest: #0a0a14;
-$bg-dark:    #14141f;
-$bg-light:   #1f1f2e;
-$bg-panel:   #181826;
-$accent-cyan:    #00d4ff;
-$accent-magenta: #ff00aa;
-$accent-purple:  #a855f7;
-$accent-green:   #00ff88;
-$accent-yellow:  #fbbf24;
-$accent-red:     #ff3366;
-$text:     #e0e0ff;
-$text-dim: #8080a0;
-$muted:    #4a4a6a;
+/* deuspy — central stylesheet.
+ *
+ * Uses Textual's design tokens ($primary, $accent, $panel, $surface, $boost,
+ * $success, $warning, $error, $text, $text-muted) so themes swap cleanly.
+ * Override any token with a custom theme via App.theme = "...".
+ */
 
 Screen {
-    background: $bg-darkest;
+    background: $background;
     color: $text;
 }
 
 Header {
-    background: $bg-dark;
-    color: $accent-cyan;
+    background: $boost;
+    color: $accent;
     text-style: bold;
+    height: 1;
+    border-bottom: hkey $accent 30%;
 }
 
 Footer {
-    background: $bg-dark;
-    color: $text-dim;
+    background: $boost;
+    color: $text-muted;
 }
 Footer > .footer--key {
-    color: $accent-magenta;
+    color: $accent;
+    background: $boost;
     text-style: bold;
 }
 Footer > .footer--description {
     color: $text;
-}
-
-TabbedContent {
-    background: $bg-darkest;
-}
-Tabs {
-    background: $bg-dark;
-}
-Tab {
-    color: $text-dim;
-    padding: 0 2;
-}
-Tab.-active {
-    color: $accent-cyan;
-    text-style: bold;
-}
-Underline > .underline--bar {
-    color: $accent-magenta;
+    background: $boost;
 }
 
 #main-title {
     content-align: center middle;
     height: 1;
-    color: $accent-magenta;
+    color: $accent;
     text-style: bold;
-    background: $bg-dark;
+    background: $boost;
+    border-bottom: hkey $accent 30%;
 }
 
-Button {
-    background: $bg-light;
+#status-bar {
+    dock: bottom;
+    height: 1;
+    background: $boost;
     color: $text;
-    border: tall $muted;
+    border-top: hkey $accent 30%;
+}
+
+/* ---- TabbedContent / Tabs --------------------------------------------- */
+
+TabbedContent { background: $background; }
+Tabs { background: $boost; }
+Tab {
+    color: $text-muted;
+    padding: 0 2;
+    text-style: bold;
+}
+Tab.-active {
+    color: $accent;
+    text-style: bold;
+}
+Underline > .underline--bar { color: $primary; }
+
+/* ---- Buttons ---------------------------------------------------------- */
+
+Button {
+    border: tall $surface;
+    background: $panel;
+    color: $text;
     margin: 0 1;
     min-width: 12;
     text-style: bold;
 }
-Button:hover {
-    border: tall $accent-cyan;
-    color: $accent-cyan;
-    background: $bg-light;
-}
 Button:focus {
-    border: tall $accent-magenta;
-    color: $accent-magenta;
+    border: tall $accent;
+    text-style: bold reverse;
+}
+Button:hover {
+    border: tall $accent;
 }
 Button.-primary {
-    background: $bg-light;
-    color: $accent-green;
-    border: tall $accent-green;
+    background: $primary 30%;
+    color: $primary-lighten-3;
+    border: tall $primary;
 }
-Button.-primary:hover {
-    background: $accent-green 30%;
-}
-Button.-danger {
-    color: $accent-red;
-    border: tall $accent-red;
-}
-Button.-danger:hover {
-    background: $accent-red 30%;
+Button.-success {
+    background: $success 30%;
+    color: $success-lighten-3;
+    border: tall $success;
 }
 Button.-warning {
-    color: $accent-yellow;
-    border: tall $accent-yellow;
+    background: $warning 30%;
+    color: $warning-lighten-3;
+    border: tall $warning;
+}
+Button.-error {
+    background: $error 30%;
+    color: $error-lighten-3;
+    border: tall $error;
 }
 
-Input {
-    background: $bg-dark;
+/* ---- Inputs / Selects -------------------------------------------------- */
+
+Input, Select {
+    background: $panel;
     color: $text;
-    border: tall $muted;
+    border: tall $surface;
 }
-Input:focus {
-    border: tall $accent-cyan;
-}
-
-Select {
-    background: $bg-dark;
-    color: $text;
-    border: tall $muted;
-}
-Select:focus {
-    border: tall $accent-cyan;
+Input:focus, Select:focus {
+    border: tall $accent;
 }
 
-Static.panel-title {
+/* ---- Panels ------------------------------------------------------------ */
+/* Generic panel — used by the dashboard cards. The :focus-within rule gives
+ * us the "active panel glows" trick that makes a TUI feel alive. */
+
+.panel {
+    border: round $surface;
+    background: $surface;
+    padding: 0 1;
+}
+.panel:focus-within {
+    border: round $accent;
+    background: $surface;
+}
+
+.panel-title {
     content-align: center middle;
-    color: $accent-magenta;
+    color: $accent;
     text-style: bold;
     height: 1;
-    background: $bg-light;
+    background: $boost;
+    border-bottom: hkey $accent 30%;
+}
+.panel-subtitle {
+    content-align: center middle;
+    color: $text-muted;
+    text-style: italic;
+    height: 1;
 }
 
+/* ---- DataTable -------------------------------------------------------- */
+
 DataTable {
-    background: $bg-panel;
+    background: $surface;
     color: $text;
 }
 DataTable > .datatable--header {
-    background: $bg-light;
-    color: $accent-cyan;
+    background: $boost;
+    color: $accent;
     text-style: bold;
 }
 DataTable > .datatable--cursor {
-    background: $accent-magenta 30%;
+    background: $primary 30%;
     color: $text;
 }
 
-Log {
-    background: $bg-darkest;
-    color: $text;
-    border: round $muted;
-}
+/* ---- Logs ------------------------------------------------------------- */
 
-ProgressBar > .bar--bar {
-    color: $accent-magenta;
-}
-ProgressBar > .bar--complete {
-    color: $accent-green;
-}
-ProgressBar > .bar--indeterminate {
-    color: $accent-cyan;
-}
-
-ListView {
-    background: $bg-panel;
-    border: round $muted;
-}
-ListItem {
-    background: $bg-panel;
+RichLog, Log {
+    background: $background;
     color: $text;
+    border: round $surface;
     padding: 0 1;
 }
+RichLog:focus, Log:focus {
+    border: round $accent;
+}
+
+/* ---- Progress + ListView ---------------------------------------------- */
+
+ProgressBar > .bar--bar { color: $primary; }
+ProgressBar > .bar--complete { color: $success; }
+ProgressBar > .bar--indeterminate { color: $accent; }
+
+ListView { background: $surface; border: round $surface; }
+ListItem { background: $surface; color: $text; padding: 0 1; }
 ListItem.-highlight, ListItem:hover {
-    background: $accent-magenta 20%;
-    color: $accent-magenta;
+    background: $primary 20%;
+    color: $primary-lighten-2;
 }
 
-/* generic neon panel */
-.panel {
-    border: round $accent-purple;
-    background: $bg-panel;
-    padding: 0 1;
+/* ---- Digits readout --------------------------------------------------- */
+
+Digits {
+    color: $accent;
+    background: $background;
 }
-.panel-cyan { border: round $accent-cyan; }
-.panel-magenta { border: round $accent-magenta; }
-.panel-green { border: round $accent-green; }
-.panel-yellow { border: round $accent-yellow; }
-.panel-red { border: round $accent-red; }
 
-.led-on  { color: $accent-green; text-style: bold; }
-.led-off { color: $muted; }
-.led-warn { color: $accent-yellow; text-style: bold; }
-.led-err  { color: $accent-red; text-style: bold; }
-
-.kv-key { color: $text-dim; }
-.kv-val { color: $accent-cyan; text-style: bold; }
+/* ---- Generic key/value rows in info cards ----------------------------- */
+.kv-key { color: $text-muted; }
+.kv-val { color: $accent; text-style: bold; }

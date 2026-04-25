@@ -24,18 +24,18 @@ class StockDialog(ModalScreen[tuple[float, float, float] | None]):
     StockDialog { align: center middle; }
     #stock-card {
         width: 50; height: auto;
-        background: #181826;
-        border: round #00d4ff;
+        background: $surface;
+        border: tall cyan;
         padding: 1 2;
     }
     #stock-title {
         content-align: center middle;
-        color: #00d4ff;
+        color: cyan;
         text-style: bold;
         margin-bottom: 1;
     }
     .stock-row { height: 3; }
-    .stock-label { width: 8; color: #8080a0; padding: 1 1; }
+    .stock-label { width: 8; color: $text-muted; padding: 1 1; }
     .stock-input { width: 1fr; }
     #stock-buttons { margin-top: 1; align: center middle; }
     """
@@ -83,18 +83,18 @@ class ToolDialog(ModalScreen[tuple[float, str] | None]):
     ToolDialog { align: center middle; }
     #tool-card {
         width: 50; height: auto;
-        background: #181826;
-        border: round #ff00aa;
+        background: $surface;
+        border: tall magenta;
         padding: 1 2;
     }
     #tool-title {
         content-align: center middle;
-        color: #ff00aa;
+        color: magenta;
         text-style: bold;
         margin-bottom: 1;
     }
     .tool-row { height: 3; }
-    .tool-label { width: 14; color: #8080a0; padding: 1 1; }
+    .tool-label { width: 14; color: $text-muted; padding: 1 1; }
     .tool-input { width: 1fr; }
     #tool-buttons { margin-top: 1; align: center middle; }
     """
@@ -132,76 +132,79 @@ class ReplScreen(Container):
 
     DEFAULT_CSS = """
     ReplScreen {
-        layout: horizontal;
+        layout: grid;
+        grid-size: 3 1;
+        grid-columns: 30 1fr 30;
+        grid-gutter: 0 2;
         padding: 1 2;
     }
-    #repl-left {
-        width: 30;
-        height: 1fr;
-    }
     #repl-center {
-        width: 1fr;
-        height: 1fr;
-        margin: 0 1;
+        layout: grid;
+        grid-size: 1 2;
+        grid-rows: 1fr 3;
+        grid-gutter: 1 0;
     }
     #repl-right {
-        width: 30;
-        height: 1fr;
+        layout: vertical;
     }
     #history-panel {
-        height: 1fr;
-        border: round #a855f7;
-        background: #0a0a14;
+        layout: grid;
+        grid-size: 1 2;
+        grid-rows: 1 1fr;
+        border: round $surface;
+        background: $background;
     }
+    #history-panel:focus-within { border: round cyan; }
     #history-title {
         content-align: center middle;
-        color: #a855f7;
+        color: cyan;
         text-style: bold;
-        height: 1;
-        background: #181826;
-    }
-    #history-log {
-        height: 1fr;
-        background: #0a0a14;
+        background: $boost;
     }
     #cmd-row {
+        layout: horizontal;
         height: 3;
-        margin-top: 1;
     }
     #cmd-prompt {
         width: 5;
-        color: #00ff88;
+        color: green;
         padding: 1 1;
         text-style: bold;
     }
     #cmd-input { width: 1fr; }
+
     .actions-card {
-        border: round #00ff88;
-        background: #181826;
+        layout: vertical;
+        border: round $surface;
+        background: $surface;
         padding: 0 1;
         height: auto;
         margin-bottom: 1;
     }
+    .actions-card:focus-within { border: round cyan; }
     .actions-card > .title {
         content-align: center middle;
-        color: #00ff88;
+        color: cyan;
         text-style: bold;
-        height: 1;
+        background: $boost;
     }
-    .action-btn {
+    .actions-card Button {
         width: 100%;
         margin: 0 0;
     }
     """
 
-    PRELUDE = """\
-[bold #ff00aa]deuspy REPL[/]   [#8080a0]· deuspy module pre-imported as `d` ·[/]
-[#8080a0]Examples:[/]
-  [#00d4ff]d.move(d.origin)[/]                  · [#00d4ff]d.set_units(d.MM)[/]
-  [#00d4ff]d.set_movement_speed(100)[/]         · [#00d4ff]d.move(x=2, y=2)[/]
-  [#00d4ff]d.execute(d.Box(length=4, width=4, height=2))[/]
-[#8080a0]Type any Python expression. Use the buttons on the right for common actions.[/]
-"""
+    PRELUDE = (
+        "[b cyan]◆ deuspy REPL ◆[/]   "
+        "[dim]deuspy is pre-imported as `d`[/]\n"
+        "[dim]examples:[/]\n"
+        "  [magenta]d.move(d.origin)[/]                · "
+        "[magenta]d.set_units(d.MM)[/]\n"
+        "  [magenta]d.set_movement_speed(100)[/]       · "
+        "[magenta]d.move(x=2, y=2)[/]\n"
+        "  [magenta]d.execute(d.Box(length=4, width=4, height=2))[/]\n"
+        "[dim]type any Python expression · use ↑/↓ for history · buttons → quick actions[/]"
+    )
 
     def __init__(self) -> None:
         super().__init__()
@@ -212,8 +215,7 @@ class ReplScreen(Container):
         self._namespace: dict[str, Any] = {"d": deuspy, "deuspy": deuspy, "__name__": "__deuspy_repl__"}
 
     def compose(self) -> ComposeResult:
-        with Vertical(id="repl-left"):
-            yield MachineStatePanel()
+        yield MachineStatePanel(id="repl-left")
         with Vertical(id="repl-center"):
             with Vertical(id="history-panel"):
                 yield Static("◆ HISTORY ◆", id="history-title")
@@ -224,17 +226,17 @@ class ReplScreen(Container):
         with Vertical(id="repl-right"):
             with Vertical(classes="actions-card"):
                 yield Static("◆ MOTION ◆", classes="title")
-                yield Button("⌂ HOME", id="act-home", classes="action-btn")
-                yield Button("◯ ORIGIN", id="act-origin", classes="action-btn")
-                yield Button("✛ CENTER", id="act-center", classes="action-btn")
-                yield Button("⏏ SAFE Z", id="act-safe", classes="action-btn")
-                yield Button("✖ STOP!", id="act-stop", classes="action-btn", variant="error")
+                yield Button("⌂ Home", id="act-home", variant="primary")
+                yield Button("◯ Origin", id="act-origin", variant="primary")
+                yield Button("✛ Center", id="act-center", variant="primary")
+                yield Button("↑ Safe Z", id="act-safe", variant="primary")
+                yield Button("⏹ STOP", id="act-stop", variant="error")
             with Vertical(classes="actions-card"):
                 yield Static("◆ SETUP ◆", classes="title")
-                yield Button("📦 STOCK", id="act-stock", classes="action-btn")
-                yield Button("⚙ TOOL", id="act-tool", classes="action-btn")
-                yield Button("🎯 SET ORIGIN", id="act-set-origin", classes="action-btn")
-                yield Button("🔓 UNLOCK", id="act-unlock", classes="action-btn", variant="warning")
+                yield Button("▢ Stock", id="act-stock")
+                yield Button("⚙ Tool", id="act-tool")
+                yield Button("⌖ Set Origin", id="act-set-origin", variant="success")
+                yield Button("⚿ Unlock", id="act-unlock", variant="warning")
             yield JogPad()
 
     def on_mount(self) -> None:

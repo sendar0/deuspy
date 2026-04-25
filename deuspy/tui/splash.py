@@ -9,20 +9,13 @@ from textual.reactive import reactive
 from textual.screen import Screen
 from textual.widgets import ProgressBar, Static
 
+# Clean figlet-style logo (block characters), wider than tall.
 LOGO = r"""
-        ▓▓▓▓▒▒░░    ░░▒▒▓▓▓▓
-     ╔══════════════════════════╗
-   ╔═╝                            ╚═╗
-   ║   ██████  ███████ ██    ██     ║
-   ║   ██   ██ ██      ██    ██     ║
-   ║   ██   ██ █████   ██    ██     ║
-   ║   ██   ██ ██      ██    ██     ║
-   ║   ██████  ███████  ██████      ║
-   ║                                ║
-   ║         S P Y                  ║
-   ╚═╗                            ╔═╝
-     ╚══════════════════════════╝
-        ▓▓▓▓▒▒░░    ░░▒▒▓▓▓▓
+ ▄▄▄▄    ▄▄▄▄▄▄  ▄▄  ▄▄   ▄▄▄▄   ▄▄▄▄▄    ▄▄  ▄▄
+ ██▀▀█▄  ██▀▀▀▀  ██  ██  ██▀▀▀▀  ██▀▀██▀  ██  ██
+ ██   ██ █████   ██  ██  ▀▀████  ██████   ██▄▄██
+ ██   ██ ██      ██  ██  ▄▄  ██  ██       ▀▀▀▀██
+ ██▄▄█▀  ██▄▄▄▄▄ ▀█▄▄█▀  ▀█▄▄█▀  ██       ▄▄▄▄██
 """
 
 TAGLINE = "deus py machina · interactive GRBL CNC control"
@@ -34,18 +27,19 @@ HINTS = [
     "polishing the bits",
     "dust collector: ready",
     "summoning subroutines",
+    "waxing the ways",
+    "tightening the collet",
 ]
 
 
 class SplashLogo(Static):
-    """The big neon logo with a pulsing colour glow."""
+    """The big logo with a pulsing colour glow that cycles through theme accents."""
 
     DEFAULT_CSS = """
     SplashLogo {
         content-align: center middle;
         width: auto;
         height: auto;
-        color: $accent;
         text-style: bold;
     }
     """
@@ -53,10 +47,10 @@ class SplashLogo(Static):
     pulse: reactive[int] = reactive(0)
 
     def render(self) -> str:
-        # Pulse through a small palette of accent shades.
-        palette = ["#ff00aa", "#d600ff", "#9d00ff", "#00d4ff", "#00ff88", "#9d00ff", "#d600ff"]
-        colour = palette[self.pulse % len(palette)]
-        return f"[{colour}]{LOGO}[/{colour}]"
+        # Cycle through theme tokens so it tracks the active palette.
+        tokens = ["magenta", "cyan", "green", "yellow", "cyan"]
+        token = tokens[self.pulse % len(tokens)]
+        return f"[{token}]{LOGO}[/]"
 
 
 class SplashScreen(Screen):
@@ -68,7 +62,7 @@ class SplashScreen(Screen):
 
     DEFAULT_CSS = """
     SplashScreen {
-        background: #0a0a14;
+        background: $background;
         align: center middle;
     }
     #splash-stack {
@@ -78,19 +72,24 @@ class SplashScreen(Screen):
     }
     #splash-tagline {
         content-align: center middle;
-        color: #8080a0;
+        color: $text-muted;
         text-style: italic;
         margin-top: 1;
     }
     #splash-hint {
         content-align: center middle;
-        color: #00d4ff;
+        color: cyan;
         margin-top: 1;
         width: 60;
     }
     #splash-bar {
         margin-top: 2;
         width: 60;
+    }
+    #splash-skip {
+        content-align: center middle;
+        color: $text-muted;
+        margin-top: 2;
     }
     """
 
@@ -106,6 +105,7 @@ class SplashScreen(Screen):
             yield Static(TAGLINE, id="splash-tagline")
             yield Static("[ booting ]", id="splash-hint")
             yield ProgressBar(total=100, show_eta=False, show_percentage=False, id="splash-bar")
+            yield Static("press [b]enter[/] to skip", id="splash-skip")
 
     def on_mount(self) -> None:
         # Pulse the logo every 120 ms.

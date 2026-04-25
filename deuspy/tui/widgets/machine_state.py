@@ -1,12 +1,10 @@
-"""Live machine state panel — shown in the REPL screen."""
+"""Live machine state panel with Digits readouts for X/Y/Z."""
 
 from __future__ import annotations
 
-from rich.text import Text
 from textual.app import ComposeResult
-from textual.containers import Container
-from textual.reactive import reactive
-from textual.widgets import Static
+from textual.containers import Container, Horizontal
+from textual.widgets import Digits, Static
 
 
 class MachineStatePanel(Container):
@@ -14,31 +12,57 @@ class MachineStatePanel(Container):
 
     DEFAULT_CSS = """
     MachineStatePanel {
-        border: round #00d4ff;
-        background: #181826;
+        layout: grid;
+        grid-size: 1 5;
+        grid-rows: 1 5 1fr 1 1;
+        border: round $surface;
+        background: $surface;
         padding: 0 1;
-        layout: vertical;
-        width: 28;
-        height: auto;
     }
+    MachineStatePanel:focus-within { border: round cyan; }
     MachineStatePanel > .title {
         content-align: center middle;
-        color: #00d4ff;
+        color: cyan;
         text-style: bold;
-        height: 1;
+        background: $boost;
     }
-    .state-row {
-        height: 1;
+    .axis-row {
+        layout: horizontal;
+        height: 5;
+        align: center middle;
     }
-    .state-led { height: 1; content-align: center middle; }
+    .axis-label {
+        width: 4;
+        content-align: center middle;
+        color: $text-muted;
+        text-style: bold;
+    }
+    Digits {
+        width: 1fr;
+        text-align: right;
+        color: cyan;
+    }
+    #state-meta {
+        color: $text;
+    }
+    .state-led {
+        content-align: center middle;
+    }
     """
-
-    state_text: reactive[Text] = reactive(Text(), recompose=False)
 
     def compose(self) -> ComposeResult:
         yield Static("◆ MACHINE ◆", classes="title")
-        yield Static(id="state-body")
-        yield Static("[#4a4a6a]●[/] disconnected", id="state-led", classes="state-led")
+        with Horizontal(classes="axis-row"):
+            yield Static("X", classes="axis-label")
+            yield Digits("0.000", id="dro-x")
+        with Horizontal(classes="axis-row"):
+            yield Static("Y", classes="axis-label")
+            yield Digits("0.000", id="dro-y")
+        with Horizontal(classes="axis-row"):
+            yield Static("Z", classes="axis-label")
+            yield Digits("0.000", id="dro-z")
+        yield Static("", id="state-meta")
+        yield Static("[dim]○ disconnected[/]", id="state-led", classes="state-led")
 
     def on_mount(self) -> None:
         self.set_interval(0.25, self._refresh)
@@ -49,37 +73,35 @@ class MachineStatePanel(Container):
 
         m = get_machine()
         connected = bool(m.backends)
-        led = (
-            "[#00ff88 bold]● CONNECTED[/]"
-            if connected
-            else "[#4a4a6a]● disconnected[/]"
-        )
         if m.state.name == "HALTED":
-            led = "[#ff3366 bold]● HALTED[/]"
+            led = "[red b]● HALTED[/]"
+        elif connected:
+            led = "[green b]● CONNECTED[/]"
+        else:
+            led = "[dim]○ disconnected[/]"
+
+        self.query_one("#dro-x", Digits).update(f"{m.position.x:7.3f}")
+        self.query_one("#dro-y", Digits).update(f"{m.position.y:7.3f}")
+        self.query_one("#dro-z", Digits).update(f"{m.position.z:7.3f}")
         self.query_one("#state-led", Static).update(led)
 
         spindle = (
-            f"[#00ff88]{m.spindle_rpm:.0f} rpm[/]"
+            f"[green b]{m.spindle_rpm:.0f}[/] rpm"
             if m.spindle_rpm > 0
-            else "[#8080a0]OFF[/]"
+            else "[dim]off[/]"
         )
-        wcs_label = f"G5{3 + m.wcs_slot}" if 1 <= m.wcs_slot <= 6 else "?"
-        body = (
-            f"[#8080a0]Position[/]\n"
-            f"  [#8080a0]X[/] [#00d4ff bold]{m.position.x:9.3f}[/]\n"
-            f"  [#8080a0]Y[/] [#00d4ff bold]{m.position.y:9.3f}[/]\n"
-            f"  [#8080a0]Z[/] [#00d4ff bold]{m.position.z:9.3f}[/]\n"
-            f"\n"
-            f"[#8080a0]Units[/]    [#a855f7]{m.units.value.upper()}[/]\n"
-            f"[#8080a0]Feed[/]     [#a855f7]{m.feed:g}[/]\n"
-            f"[#8080a0]Spindle[/]  {spindle}\n"
-            f"[#8080a0]WCS[/]      [#fbbf24]{wcs_label}[/]\n"
-            f"[#8080a0]Tool Ø[/]   [#a855f7]{m.tool.diameter:g}[/]\n"
-            f"[#8080a0]Safe Z[/]   [#a855f7]{m.safe_z:g}[/]\n"
+        wcs = f"G5{3 + m.wcs_slot}" if 1 <= m.wcs_slot <= 6 else "?"
+        meta = (
+            f"[dim]units[/] [b]{m.units.value.upper()}[/]   "
+            f"[dim]feed[/] [b]{m.feed:g}[/]\n"
+            f"[dim]spindle[/] {spindle}   "
+            f"[dim]WCS[/] [b yellow]{wcs}[/]\n"
+            f"[dim]tool Ø[/] [b]{m.tool.diameter:g}[/]   "
+            f"[dim]safe Z[/] [b]{m.safe_z:g}[/]"
         )
         if m.stock is not None:
-            body += (
-                f"\n[#8080a0]Stock[/]\n"
-                f"  [#00d4ff]{m.stock.size.x:g}×{m.stock.size.y:g}×{m.stock.size.z:g}[/]\n"
+            meta += (
+                f"\n[dim]stock[/] [cyan]"
+                f"{m.stock.size.x:g}×{m.stock.size.y:g}×{m.stock.size.z:g}[/]"
             )
-        self.query_one("#state-body", Static).update(body)
+        self.query_one("#state-meta", Static).update(meta)
