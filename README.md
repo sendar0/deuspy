@@ -1,5 +1,7 @@
 # deuspy
 
+> ⚠️ **WARNING — highly experimental, untested, unfinished, and largely non-functional.** Do **not** point this at a real CNC machine you care about. Coordinate systems, feeds, and toolpaths have not been validated against hardware. Use at your own risk; expect bugs, crashes, missing features, and unsafe G-code. Treat every output as suspect.
+
 *deus py machina* — interactive control of a [GRBL](https://github.com/gnea/grbl) CNC machine from a Python REPL. The goal is the ergonomics of a manual machine: type a command, the head moves.
 
 ## Install
@@ -19,6 +21,22 @@ uv pip install -e '.[viz,dev]'
 ```
 
 Activate the venv with `source .venv/bin/activate`, or prefix commands with `uv run` (e.g. `uv run pytest`).
+
+## TUI
+
+A Textual-based terminal UI ships with the package:
+
+```bash
+uv run deuspy-tui
+```
+
+It opens with an animated splash, then a tabbed shell:
+
+- **Machines** — add / edit / delete saved machine profiles (persisted to `~/.config/deuspy/machines.json`), set an active profile, connect / disconnect.
+- **Designer** — pick a shape (Box, Cylinder, Hole, Star, Polyline rectangle) and a strategy (Pocket / Perimeter / Engrave / PeckDrill); dry-run and see an ASCII top-down toolpath preview with stats; "3D View" launches the pyvista 3D viewer in a Qt window.
+- **REPL** — live machine state panel, command history, full Python REPL with the `deuspy` API pre-imported as `d`, plus quick-action buttons (Home, Origin, Center, Stop, Set Stock, Tool, Unlock) and a jog pad with X±/Y±/Z± and step-size control.
+
+Keys: `1` / `2` / `3` switch tabs · `q` quits · `?` help.
 
 ## Quick start
 
@@ -63,12 +81,6 @@ Activate the venv with `source .venv/bin/activate`, or prefix commands with `uv 
 - **Ctrl-C** during a blocking move issues a feed-hold (`!`) immediately, then re-raises so the prompt returns. Resume with `unlock()` after clearing the cause.
 - An `ALARM:N` from the controller raises `AlarmError`; **the library never auto-clears alarms**. Investigate, then call `unlock()`.
 - `stop(soft=True)` is a feed-hold; `stop(soft=False)` is a soft-reset that requires re-`connect()`.
-
-## What's in v1
-
-`Box` shape + `Pocket`/`Perimeter`/`Engrave` strategies (single tool, flat endmill, manual safe-Z); blocking dispatch; status polling; pyvista visualizer; alarm/feed-hold/soft-reset paths; single G54 work coordinate system.
-
-Stubbed for v2: arc moves (G2/G3), other shapes (Cylinder, Hole, Polyline), DXF/SVG import, probing, tool changes, multi-WCS, async streaming `Job` handles, character-counting streamer.
 
 ## Running the tests
 

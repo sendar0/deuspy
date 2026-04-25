@@ -52,3 +52,44 @@ class Polyline(Shape):
             Vec3(a.x, a.y + width, a.z),
         ]
         return cls(points=pts, depth=depth, closed=True)
+
+    @classmethod
+    def star(
+        cls,
+        *,
+        points: int = 5,
+        outer_radius: float,
+        inner_radius: float,
+        depth: float,
+        anchor: Vec3 = ORIGIN,
+        rotation: float = 0.0,
+    ) -> Polyline:
+        """Regular n-pointed star centred on `anchor`.
+
+        points:        number of star tips (≥3).
+        outer_radius:  distance from centre to a tip.
+        inner_radius:  distance from centre to a valley between tips.
+        rotation:      rotation in radians; 0 puts the first tip on +Y.
+        """
+        import math
+
+        if points < 3:
+            raise ValueError(f"Star needs ≥3 points, got {points}")
+        if outer_radius <= 0 or inner_radius <= 0:
+            raise ValueError("Star radii must be > 0")
+        if inner_radius >= outer_radius:
+            raise ValueError("inner_radius must be < outer_radius")
+
+        verts: list[Vec3] = []
+        # 2*points vertices alternating outer / inner.
+        for i in range(2 * points):
+            r = outer_radius if i % 2 == 0 else inner_radius
+            angle = rotation + math.pi / 2 + i * math.pi / points
+            verts.append(
+                Vec3(
+                    anchor.x + r * math.cos(angle),
+                    anchor.y + r * math.sin(angle),
+                    anchor.z,
+                )
+            )
+        return cls(points=verts, depth=depth, closed=True)
