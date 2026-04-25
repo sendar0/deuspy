@@ -223,19 +223,41 @@ class DesignerScreen(Container):
         self.app.notify(f"Generated {len(tp)} moves.", severity="information")
 
     def _launch_3d(self) -> None:
+        """Spawn the 3D viewer in a subprocess.
+
+        Running pyvistaqt inside the Textual process tends to crash the whole
+        thing on X11 (BadWindow), since Qt and the asyncio loop fight over the
+        display. A subprocess gives Qt its own X connection and isolates errors.
+        """
         if not getattr(self, "_last_tp", None):
             self.app.notify("Run Dry Run first.", severity="warning")
             return
+
+        import subprocess
+        import sys
+        import tempfile
+        from pathlib import Path
+
         try:
-            from deuspy.viz.pyvista_viewer import PyVistaBackend  # type: ignore[import-not-found]
-        except RuntimeError as exc:
-            self.app.notify(f"3D viewer unavailable: {exc}", severity="error")
-            return
-        try:
-            backend = PyVistaBackend()
-            for line in self._last_tp.iter_gcode():
-                backend.send(line, blocking=False)
-            self.app.notify("3D viewer launched in a separate window.", severity="information")
+            tmp = tempfile.NamedTemporaryFile(
+                mode="w", suffix=".gcode", prefix="deuspy-viz-", delete=False
+            )
+            with tmp as fh:
+                for line in self._last_tp.iter_gcode():
+                    fh.write(line + "\n")
+            log_path = Path(tmp.name).with_suffix(".log")
+            log_fh = log_path.open("w")
+            subprocess.Popen(
+                [sys.executable, "-m", "deuspy.viz.standalone", tmp.name],
+                stdout=log_fh,
+                stderr=log_fh,
+                start_new_session=True,
+            )
+            self.app.notify(
+                f"3D viewer launched · log: {log_path}",
+                severity="information",
+                timeout=8,
+            )
         except Exception as exc:  # noqa: BLE001
             self.app.notify(f"3D viewer failed: {exc}", severity="error")
 
