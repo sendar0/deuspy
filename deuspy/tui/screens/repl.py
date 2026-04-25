@@ -7,6 +7,7 @@ import io
 import traceback
 from typing import Any
 
+from textual import work
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, Vertical
 from textual.screen import ModalScreen
@@ -303,7 +304,7 @@ class ReplScreen(Container):
 
     # ---- quick actions ------------------------------------------------------
 
-    async def on_button_pressed(self, event: Button.Pressed) -> None:
+    def on_button_pressed(self, event: Button.Pressed) -> None:
         bid = event.button.id
         if bid == "act-home":
             self._safe_call("d.home()")
@@ -316,9 +317,9 @@ class ReplScreen(Container):
         elif bid == "act-stop":
             self._safe_call("d.stop()")
         elif bid == "act-stock":
-            await self._set_stock_dialog()
+            self._set_stock_dialog()
         elif bid == "act-tool":
-            await self._tool_dialog()
+            self._tool_dialog()
         elif bid == "act-set-origin":
             self._safe_call("d.set_origin(d.origin)")
         elif bid == "act-unlock":
@@ -346,6 +347,7 @@ class ReplScreen(Container):
     def _not_connected(self) -> None:
         self.app.notify("Not connected. Use the Machines tab to connect.", severity="warning")
 
+    @work
     async def _set_stock_dialog(self) -> None:
         from deuspy.machine import get_machine
         m = get_machine()
@@ -356,6 +358,7 @@ class ReplScreen(Container):
         x, y, z = result
         self._eval(f"d.set_stock(d.Vec3({x}, {y}, {z}))")
 
+    @work
     async def _tool_dialog(self) -> None:
         result = await self.app.push_screen_wait(ToolDialog())
         if result is None:

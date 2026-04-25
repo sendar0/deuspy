@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from textual import work
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, Vertical
 from textual.screen import ModalScreen
@@ -260,12 +261,12 @@ class MachinesScreen(Container):
     def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
         self._update_detail()
 
-    async def on_button_pressed(self, event: Button.Pressed) -> None:
+    def on_button_pressed(self, event: Button.Pressed) -> None:
         bid = event.button.id
         if bid == "btn-add":
-            await self._add()
+            self._add()
         elif bid == "btn-edit":
-            await self._edit()
+            self._edit()
         elif bid == "btn-delete":
             self._delete()
         elif bid == "btn-active":
@@ -275,6 +276,7 @@ class MachinesScreen(Container):
         elif bid == "btn-disconnect":
             self._disconnect()
 
+    @work
     async def _add(self) -> None:
         result = await self.app.push_screen_wait(MachineForm())
         if result is None:
@@ -288,6 +290,7 @@ class MachinesScreen(Container):
         self._refresh()
         self.app.notify(f"Added profile {result.name!r}.", severity="information")
 
+    @work
     async def _edit(self) -> None:
         store = self._store()
         name = self._selected_name()
