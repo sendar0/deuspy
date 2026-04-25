@@ -1,7 +1,9 @@
 """GRBL backend over pyserial.
 
-Implements the simple send-response model for v1:
-    write line, drain responses until `ok` / `error:N` / `ALARM:N`.
+Implements two transmission models:
+- send-response (v1, default): write line, await `ok` / `error:N` / `ALARM:N`.
+- streaming (v2): character-counting streamer pushes many lines into GRBL's
+  serial RX buffer (≤128 bytes) and processes acks as they arrive.
 
 For motion commands in blocking mode, after `ok` we poll `?` until the controller
 reports state=Idle and the planner buffer is full again (Bf == max).
@@ -11,12 +13,19 @@ from __future__ import annotations
 
 import logging
 import re
+import threading
 import time
+from collections import deque
+from collections.abc import Iterable
 
 from deuspy import config, gcode
 from deuspy.backends.base import BackendResult, MachineStatus
 from deuspy.errors import AlarmError, ConnectionLost, GrblError
+from deuspy.job import Job
 from deuspy.units import ORIGIN, Vec3
+
+# GRBL 1.1 serial RX buffer is 128 bytes by default.
+GRBL_RX_BUFFER = 128
 
 log = logging.getLogger("deuspy.grbl")
 
@@ -117,6 +126,10 @@ class GrblBackend:
         self._last_status: MachineStatus | None = None
         self._max_buffer_free = 15  # GRBL default planner depth
         self._opened = False
+        # Streaming state — guarded by _io_lock; only one of {send, stream} can
+        # hold the port at a time.
+        self._io_lock = threading.Lock()
+        self._streaming = False
 
     def is_authoritative(self) -> bool:
         return True
@@ -174,20 +187,97 @@ class GrblBackend:
     def send(self, line: str, *, blocking: bool = True) -> BackendResult:
         if not self._opened or self._ser is None:
             raise ConnectionLost("GRBL backend is not open.")
+        if self._streaming:
+            raise ConnectionLost("Cannot send while a streaming Job is in progress.")
 
         payload = line.strip()
         if not payload:
             return BackendResult(ok=True)
 
-        self._write(payload + "\n")
-        result = self._await_ack(payload)
-        if not result.ok:
-            return result
+        with self._io_lock:
+            self._write(payload + "\n")
+            result = self._await_ack(payload)
+            if not result.ok:
+                return result
 
-        if blocking and payload.split(maxsplit=1)[0] in ("G0", "G1", "$H"):
-            self._wait_idle()
+            if blocking and payload.split(maxsplit=1)[0] in ("G0", "G1", "G2", "G3", "$H"):
+                self._wait_idle()
 
         return result
+
+    def stream(self, lines: Iterable[str], job: Job) -> None:
+        """Push `lines` into GRBL using a character-counting streamer in a worker thread.
+
+        Returns immediately after spawning the worker. The Job tracks progress;
+        cancel via job.cancel() (issues feed-hold + soft-reset).
+        """
+        materialized = [line.strip() for line in lines if line.strip()]
+        job.total_lines = len(materialized)
+        thread = threading.Thread(
+            target=self._stream_worker,
+            args=(materialized, job),
+            name="deuspy-grbl-stream",
+            daemon=True,
+        )
+        job._thread = thread
+        self._streaming = True
+        thread.start()
+
+    def _stream_worker(self, lines: list[str], job: Job) -> None:
+        """Character-counting streamer. Runs on its own thread; owns _io_lock."""
+        pending: deque[int] = deque()  # bytes-in-flight per outstanding line
+        in_flight = 0
+        idx = 0
+        error: Exception | None = None
+
+        try:
+            with self._io_lock:
+                while idx < len(lines) or pending:
+                    if job._cancelled and pending:
+                        # User asked to stop. Issue feed-hold + soft-reset and bail.
+                        self._write_raw(gcode.feed_hold().encode("ascii"))
+                        time.sleep(0.05)
+                        self._write_raw(gcode.soft_reset().encode("ascii"))
+                        self._drain_for(0.5)
+                        break
+                    if job._cancelled:
+                        break
+
+                    # Push as many lines as fit into GRBL's RX buffer.
+                    while idx < len(lines):
+                        line = lines[idx]
+                        encoded_len = len(line) + 1  # newline
+                        if in_flight + encoded_len > GRBL_RX_BUFFER:
+                            break
+                        self._write(line + "\n")
+                        pending.append(encoded_len)
+                        in_flight += encoded_len
+                        idx += 1
+                        job._mark_sent()
+
+                    # Drain at least one response to make room for more.
+                    response = self._read_line(0.5)
+                    if response is None:
+                        continue
+                    if response == "ok":
+                        if pending:
+                            in_flight -= pending.popleft()
+                        job._mark_acked()
+                        continue
+                    err = _ERROR_RE.search(response)
+                    if err:
+                        error = GrblError(int(err.group(1)), lines[idx - 1] if idx else "")
+                        break
+                    alarm = _ALARM_RE.search(response)
+                    if alarm:
+                        error = AlarmError(int(alarm.group(1)), response)
+                        break
+                    self._consume(response)
+        except Exception as exc:  # noqa: BLE001
+            error = exc
+        finally:
+            self._streaming = False
+            job._finish(error)
 
     def status(self) -> MachineStatus:
         st = self._poll_status_once()

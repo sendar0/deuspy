@@ -7,7 +7,7 @@ from typing import Literal
 
 from deuspy.units import Vec3
 
-MoveKind = Literal["G0", "G1"]
+MoveKind = Literal["G0", "G1", "G2", "G3"]
 
 
 @dataclass(frozen=True)

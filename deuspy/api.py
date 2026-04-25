@@ -10,7 +10,6 @@ from deuspy.backends.dryrun import DryRunBackend
 from deuspy.machine import MachineState, Tool, get_machine, reset_machine
 from deuspy.shapes.base import Shape
 from deuspy.strategies.base import Strategy
-from deuspy.toolpath import Toolpath
 from deuspy.units import CW, ORIGIN, SpindleDirection, Unit, Vec3
 
 log = logging.getLogger("deuspy")
@@ -113,9 +112,18 @@ def home(axes: str = "xyz") -> None:
     get_machine().home(axes)
 
 
-def set_origin(pos: Vec3 = ORIGIN) -> None:
-    """Tell the controller the current machine position equals `pos` in the active WCS."""
-    get_machine().set_origin(pos)
+def set_origin(pos: Vec3 = ORIGIN, *, slot: int | None = None) -> None:
+    """Tell the controller the current machine position equals `pos`.
+
+    slot=None operates on the currently active WCS. slot=1..6 maps to G54..G59
+    and also activates that slot.
+    """
+    get_machine().set_origin(pos, slot=slot)
+
+
+def select_wcs(slot: int) -> None:
+    """Activate work coordinate system slot 1..6 (G54..G59)."""
+    get_machine().select_wcs(slot)
 
 
 def set_safe_z(z: float) -> None:
@@ -136,11 +144,12 @@ def execute(
     *,
     blocking: bool = True,
     preview: bool = False,
-) -> Toolpath:
+):
     """Generate and run a toolpath for `op`.
 
-    If strategy is None, defaults to a Pocket strategy. preview=True returns the
-    Toolpath without sending it.
+    blocking=True  → returns the planned Toolpath after the run completes.
+    blocking=False → returns (Toolpath, Job). The Job has wait()/progress()/cancel().
+    preview=True   → returns the Toolpath without sending.
     """
     return get_machine().execute(op, strategy, blocking=blocking, preview=preview)
 
@@ -148,6 +157,31 @@ def execute(
 def stop(*, soft: bool = True) -> None:
     """Halt motion. soft=True is a feed-hold; soft=False is a full reset."""
     get_machine().stop(soft=soft)
+
+
+def change_tool(tool: Tool, *, m6: bool = False, prompt: bool = True) -> None:
+    """Pause for a manual tool change. Stops spindle, retracts, swaps tool record."""
+    get_machine().change_tool(tool, m6=m6, prompt=prompt)
+
+
+def probe(
+    *,
+    direction: str = "Z-",
+    max_distance: float,
+    feed: float = 50.0,
+    error_on_no_contact: bool = True,
+) -> str:
+    """Issue a G38.2 probe; returns the emitted G-code line.
+
+    PRB response parsing is hardware-specific and not implemented in v2 — read
+    the serial transcript yourself if you need the contact point.
+    """
+    return get_machine().probe(
+        direction=direction,
+        max_distance=max_distance,
+        feed=feed,
+        error_on_no_contact=error_on_no_contact,
+    )
 
 
 def status() -> MachineStatus:

@@ -1,4 +1,4 @@
-"""Pocket strategy: clear the volume of a shape with a raster pattern."""
+"""Pocket strategy: clear the volume of a shape."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 from deuspy.shapes.base import Shape
 from deuspy.shapes.box import Box
+from deuspy.shapes.cylinder import Cylinder
 from deuspy.strategies.base import MachineContext, Strategy
 from deuspy.toolpath import Toolpath
 from deuspy.units import Vec3
@@ -14,17 +15,16 @@ from deuspy.units import Vec3
 
 @dataclass
 class Pocket(Strategy):
-    """Clear material from inside the shape's bounding box.
+    """Clear material from inside the shape.
 
     stepdown: max depth removed per pass (current units). If None, takes the full
               height in one pass (only sensible for engraving-thin shapes).
-    stepover: lateral step between raster lines, as a fraction of tool diameter
-              (0 < stepover <= 1). Defaults to 0.4 (40%) — conservative.
+    stepover: lateral step between raster lines or concentric circles, as a fraction
+              of tool diameter (0 < stepover <= 1). Defaults to 0.4 (40%).
     finish_pass: emit a perimeter cleanup pass at final depth.
-    climb: climb mill (True) vs conventional (False). Affects raster direction.
+    climb: climb mill (True) vs conventional (False). Affects toolpath direction.
 
-    v1 implementation: simple zig-zag raster aligned to X. Only Box shapes are
-    supported; other shapes raise NotImplementedError.
+    Supported shapes: Box (zig-zag raster), Cylinder (concentric circles, inside-out).
     """
 
     stepdown: float | None = None
@@ -33,14 +33,15 @@ class Pocket(Strategy):
     climb: bool = True
 
     def plan(self, shape: Shape, ctx: MachineContext) -> Toolpath:
-        if not isinstance(shape, Box):
-            raise NotImplementedError(
-                f"Pocket strategy v1 supports Box only, got {type(shape).__name__}"
-            )
         if not 0 < self.stepover <= 1:
             raise ValueError(f"stepover must be in (0, 1], got {self.stepover}")
-
-        return _pocket_box(shape, ctx, self)
+        if isinstance(shape, Box):
+            return _pocket_box(shape, ctx, self)
+        if isinstance(shape, Cylinder):
+            return _pocket_cylinder(shape, ctx, self)
+        raise NotImplementedError(
+            f"Pocket strategy supports Box and Cylinder, got {type(shape).__name__}"
+        )
 
 
 def _pocket_box(box: Box, ctx: MachineContext, strat: Pocket) -> Toolpath:
@@ -133,3 +134,56 @@ def _emit_perimeter(
         ]
     for c in corners:
         tp.add_feed(c, feed)
+
+
+def _pocket_cylinder(cyl: Cylinder, ctx: MachineContext, strat: Pocket) -> Toolpath:
+    """Clear a cylindrical volume with concentric circles, working outward.
+
+    For each Z level: plunge at centre, then expand outward in stepover increments,
+    closing each ring with a single G2 arc back to its start.
+    """
+    tp = Toolpath()
+    cx, cy, top_z = cyl.anchor.x, cyl.anchor.y, cyl.anchor.z
+    tool_r = ctx.tool_diameter / 2.0
+    r_max = cyl.radius - tool_r
+    if r_max <= 0:
+        raise ValueError(
+            f"Tool diameter {ctx.tool_diameter} too large for Cylinder radius {cyl.radius}"
+        )
+
+    total_depth = cyl.height
+    stepdown = strat.stepdown if strat.stepdown is not None else total_depth
+    n_steps = max(1, math.ceil(total_depth / stepdown))
+    z_levels = [top_z - min((i + 1) * stepdown, total_depth) for i in range(n_steps)]
+
+    plunge_rate = ctx.plunge_rate if ctx.plunge_rate is not None else ctx.feed
+    step = strat.stepover * ctx.tool_diameter
+
+    tp.add_rapid(Vec3(cx, cy, ctx.safe_z))
+
+    for z in z_levels:
+        # Plunge at centre.
+        tp.add_feed(Vec3(cx, cy, z), plunge_rate)
+        # Expand outward in concentric rings.
+        r = step
+        while r < r_max:
+            tp.add_feed(Vec3(cx + r, cy, z), ctx.feed)
+            tp.add_arc(
+                Vec3(cx + r, cy, z),
+                center_offset=Vec3(-r, 0.0, 0.0),
+                clockwise=strat.climb,
+                feed=ctx.feed,
+            )
+            r += step
+        # Final outermost ring at r_max (the cleanup / finish pass).
+        if strat.finish_pass or r >= r_max:
+            tp.add_feed(Vec3(cx + r_max, cy, z), ctx.feed)
+            tp.add_arc(
+                Vec3(cx + r_max, cy, z),
+                center_offset=Vec3(-r_max, 0.0, 0.0),
+                clockwise=strat.climb,
+                feed=ctx.feed,
+            )
+        tp.add_rapid(Vec3(cx, cy, ctx.safe_z))
+
+    return tp

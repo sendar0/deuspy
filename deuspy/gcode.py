@@ -51,6 +51,77 @@ def feed(
     return f"G1 {rest}".strip()
 
 
+def arc(
+    *,
+    x: float | None = None,
+    y: float | None = None,
+    z: float | None = None,
+    i: float | None = None,
+    j: float | None = None,
+    k: float | None = None,
+    f: float | None = None,
+    clockwise: bool = True,
+) -> str:
+    """G2 (clockwise) / G3 (counter-clockwise) arc with I/J/K offset from start.
+
+    The arc plane is whatever GRBL's modal G17/G18/G19 says (default G17 = XY).
+    For pure XY arcs, supply i and j; leave k=None.
+    """
+    head = "G2" if clockwise else "G3"
+    parts: list[str] = []
+    if x is not None:
+        parts.append(f"X{_fmt(x)}")
+    if y is not None:
+        parts.append(f"Y{_fmt(y)}")
+    if z is not None:
+        parts.append(f"Z{_fmt(z)}")
+    if i is not None:
+        parts.append(f"I{_fmt(i)}")
+    if j is not None:
+        parts.append(f"J{_fmt(j)}")
+    if k is not None:
+        parts.append(f"K{_fmt(k)}")
+    if f is not None:
+        parts.append(f"F{_fmt(f)}")
+    return f"{head} {' '.join(parts)}".strip()
+
+
+def plane_xy() -> str:
+    return "G17"
+
+
+def plane_xz() -> str:
+    return "G18"
+
+
+def plane_yz() -> str:
+    return "G19"
+
+
+def dwell(seconds: float) -> str:
+    return f"G4 P{_fmt(seconds)}"
+
+
+def tool_change(tool_number: int) -> str:
+    if tool_number < 1:
+        raise ValueError(f"tool_number must be >= 1, got {tool_number}")
+    return f"M6 T{tool_number}"
+
+
+def probe_toward(
+    *,
+    x: float | None = None,
+    y: float | None = None,
+    z: float | None = None,
+    f: float | None = None,
+    error_on_no_contact: bool = True,
+) -> str:
+    """G38.2 = probe toward target, error if no contact. G38.3 = no error on miss."""
+    head = "G38.2" if error_on_no_contact else "G38.3"
+    rest = _axes(x=x, y=y, z=z, f=f)
+    return f"{head} {rest}".strip()
+
+
 def units(unit: Unit) -> str:
     return unit.gcode
 

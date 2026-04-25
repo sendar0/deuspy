@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import re
 import sys
+from collections.abc import Iterable
 from typing import TextIO
 
 from deuspy.backends.base import BackendResult, MachineStatus
+from deuspy.job import Job
 from deuspy.units import ORIGIN, Vec3
 
 _AXIS_RE = re.compile(r"([XYZF])([-+]?\d*\.?\d+)")
@@ -59,6 +61,22 @@ class DryRunBackend:
     def close(self) -> None:
         pass
 
+    def stream(self, lines: Iterable[str], job: Job) -> None:
+        """Synchronous streaming for the DryRun backend — completes before returning."""
+        materialized = [line for line in lines if line.strip()]
+        job.total_lines = len(materialized)
+        try:
+            for line in materialized:
+                if job._cancelled:
+                    break
+                self.send(line, blocking=False)
+                job._mark_sent()
+                job._mark_acked()
+        except Exception as exc:  # noqa: BLE001
+            job._finish(exc)
+            return
+        job._finish(None)
+
     # --- simulation helpers -------------------------------------------------
 
     def _apply(self, line: str) -> None:
@@ -69,7 +87,9 @@ class DryRunBackend:
         if head == "G91":
             self._absolute = False
             return
-        if head in ("G0", "G1"):
+        if head in ("G0", "G1", "G2", "G3"):
+            # Arcs (G2/G3) end at their target (X,Y,Z); the I/J/K offsets only
+            # define the arc center, not the endpoint, so position-tracking is identical.
             self._update_position(line)
             return
         if head == "M3" or head == "M4":

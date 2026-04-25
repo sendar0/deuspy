@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING
 
 from deuspy.backends.base import BackendResult, MachineStatus
 from deuspy.units import ORIGIN, Vec3
-from deuspy.viz.events import AlarmEvent, ClearEvent, StockEvent, ToolMoveEvent, VizEvent
+from deuspy.viz.events import AlarmEvent, ClearEvent, MoveKind, StockEvent, ToolMoveEvent, VizEvent
 
 log = logging.getLogger("deuspy.viz")
 
@@ -50,7 +50,7 @@ class LineToEvent:
             with self._lock:
                 self.absolute = False
             return None
-        if head not in ("G0", "G1"):
+        if head not in ("G0", "G1", "G2", "G3"):
             return None
 
         x = y = z = None
@@ -73,7 +73,10 @@ class LineToEvent:
                     self.position.z + (z or 0.0),
                 )
             target = self.position
-        return ToolMoveEvent(target=target, kind="G0" if head == "G0" else "G1")
+        # Arcs are rendered as straight segments to the target for now.
+        # TODO: render G2/G3 as polyline approximations using I/J/K offsets.
+        kind: MoveKind = head  # type: ignore[assignment]
+        return ToolMoveEvent(target=target, kind=kind)
 
 
 class PyVistaBackend:
