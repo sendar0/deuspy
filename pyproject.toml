@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "deuspy"
+version = "0.1.0"
+description = "Interactive GRBL CNC control from a Python REPL — deus py machina"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Sander", email = "sander@ame.link" }]
+license = { text = "MIT" }
+dependencies = [
+    "pyserial>=3.5",
+    "numpy>=1.24",
+    "typing-extensions>=4.7",
+]
+
+[project.optional-dependencies]
+viz = [
+    "pyvista>=0.43",
+    "pyvistaqt>=0.11",
+    "PyQt5>=5.15",
+]
+dev = [
+    "pytest>=7.4",
+    "pytest-mock>=3.11",
+    "hypothesis>=6.90",
+    "ruff>=0.5",
+    "mypy>=1.8",
+]
+
+[tool.setuptools.packages.find]
+include = ["deuspy*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "SIM"]
+# E501: long lines; N818: exception names — `ConnectionLost` reads better than `ConnectionLostError`.
+ignore = ["E501", "N818"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
